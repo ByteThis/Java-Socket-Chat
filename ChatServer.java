@@ -12,6 +12,11 @@ import java.nio.channels.*;
 import java.nio.charset.*;
 import java.util.*;
 
+import java.util.Date;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+
 class User{
   String name;
   String currRoom;
@@ -51,9 +56,14 @@ public class ChatServer{
 
   static public void main( String args[] ) throws Exception {
     // Parse port from command line
+
+
+	
+
     int port = Integer.parseInt( args[0] );
     
     try {
+
       // Instead of creating a ServerSocket, create a ServerSocketChannel
       ServerSocketChannel ssc = ServerSocketChannel.open();
 
@@ -176,10 +186,14 @@ public class ChatServer{
     }
   }
 
-  static void sendMessage(User u, String text) {
+
+  
+
+
+  public static void sendMessage(User u, String text){
     text+='\n';
     try{
-      u.socket.getChannel().write(ByteBuffer.wrap(text.getBytes()));
+      u.socket.getChannel().write(ByteBuffer.wrap(text.getBytes()));      
     } catch (IOException e){
       System.out.println("Erro on sendMessage;");
       e.printStackTrace();
@@ -209,18 +223,35 @@ public class ChatServer{
 
 
 
-  static void chatEvents(User u, Room r, String text, String event) {
+  static void chatEvents(User u, Room r, String text, String event) throws IOException{
+  	
+  		FileWriter fw = new FileWriter(r.roomName + "_log.txt", true);
+   	 	BufferedWriter bw = new BufferedWriter(fw);
+    	PrintWriter writer = new PrintWriter(bw);
+
+    	DateFormat df = new SimpleDateFormat("dd/MM/yy HH:mm:ss");
+		Calendar calobj = Calendar.getInstance();
+		//System.out.println();
+
     switch (event){
       case "msg":
+		writer.print(calobj.getTime() + "\t>>   " + u.name + ": " + text + "\n");
+		writer.close();
         text="MESSAGE " + u.name + " " + text + "\n";
         break;
       case "join":
+      	writer.print(calobj.getTime() + "\tUSER "  + u.name + " HAS JOINED ROOM " + r.roomName + "\n");
+		writer.close();
         text="JOINED " + u.name + "\n";
         break;
       case "leave":
+      	writer.print(calobj.getTime() + "\tUSER "  + u.name + " HAS LEFT ROOM " + r.roomName + "\n");
+		writer.close();
         text="LEFT  " + u.name + "\n";
         break;
       case "newname":
+      	writer.print(calobj.getTime() + "\tUSER "  + u.name + " HAS CHANGED NAME TO " + text + "\n");
+		writer.close();
         text="NEWNICK " + u.name + " " + text + "\n";
         break;
       default:
@@ -255,7 +286,7 @@ public class ChatServer{
   }
 
   static void pvtMsg(String from, String to, String msg) {
-		msg = "PRIVATE " + from + msg + '\n';
+		msg = "(PRIVATE) " + from + ": " + msg + '\n';
 
 		for (User i : people) {
 			try {
@@ -342,8 +373,46 @@ public class ChatServer{
 	}
 
 
-
+	//		#####	OUTSIDE A ROOM 	#####
 	if (us.status.equals("outside")) {
+
+		//Get online user's list
+		if (arr.length == 1 && arr[0].equals("/online")) {
+			System.out.println("\n\nONLINE USERS\n________________");
+			sendMessage(us, "\n\nONLINE USERS\n________________");
+			for(User u : people){
+				System.out.println(u.name);
+				sendMessage(us, u.name);
+			}
+
+
+			return true;
+		}
+
+		//Get online user's list of a room
+		if (arr.length == 2 && arr[0].equals("/online")) {
+
+			Room rtest = null;
+			rtest = checkRoom(arr[1]);
+
+			//room exists
+			if (rtest != null) {
+				System.out.println("\n\nONLINE USERS IN ROOM " + rtest.roomName + "\n________________");
+				sendMessage(us, "\n\nONLINE USERS IN ROOM " + rtest.roomName + "\n________________");
+				for(User u : rtest.online){
+					System.out.println(u.name);
+					sendMessage(us, u.name);
+				}
+			}
+
+			else {
+				System.out.println("ERROR: ROOM '" + arr[1] + "'' DOES NOT EXIST");
+				sendMessage(us, "ERROR: ROOM '" + arr[1] + "'' DOES NOT EXIST");
+			}
+
+			return true;
+		}
+
 
 		if (arr.length == 2 && arr[0].equals("/nick")) {
 
@@ -395,7 +464,6 @@ public class ChatServer{
 				chatEvents(us, r, "", "join");
 				r.online.add(us); 
 			}
-
 			return true;
 		}
 
@@ -433,10 +501,11 @@ public class ChatServer{
 		sendMessage(us, "ERROR");
 		return true;
 	}
+	//		#####	END OF OUTSIDE A ROOM 	#####
 
 
 
-	//inside
+	//		#####	INSIDE A ROOM 	#####
 	if (us.status.equals("inside")) {
 
 		Room r = checkRoom(us.currRoom);
@@ -468,6 +537,43 @@ public class ChatServer{
 			us.currRoom = null;
 			
 			return false;
+		}
+
+		//Get online user's list
+		if (arr.length == 1 && arr[0].equals("/online")) {
+			System.out.println("\n\nONLINE USERS\n________________");
+			sendMessage(us, "\n\nONLINE USERS\n________________");
+			for(User u : people){
+				System.out.println(u.name);
+				sendMessage(us, u.name);
+			}
+
+
+			return true;
+		}
+
+		//Get online user's list of a room 
+		if (arr.length == 2 && arr[0].equals("/online")) {
+
+			Room rtest = null;
+			rtest = checkRoom(arr[1]);
+
+			//room exists
+			if (rtest != null) {
+				System.out.println("\n\nONLINE USERS IN ROOM " + rtest.roomName + "\n________________");
+				sendMessage(us, "\n\nONLINE USERS IN ROOM " + rtest.roomName + "\n________________");
+				for(User u : rtest.online){
+					System.out.println(u.name);
+					sendMessage(us, u.name);
+				}
+			}
+
+			else {
+				System.out.println("ERROR: ROOM '" + arr[1] + "'' DOES NOT EXIST");
+				sendMessage(us, "ERROR: ROOM '" + arr[1] + "'' DOES NOT EXIST");
+			}
+
+			return true;
 		}
 
 
